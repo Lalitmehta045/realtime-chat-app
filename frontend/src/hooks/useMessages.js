@@ -14,7 +14,7 @@ export const useMessages = (conversationId) => {
   } = useChatStore();
 
   const conversationMessages = messages.filter(
-    (m) => m.conversation === conversationId
+    (m) => (m.conversation || m.conversationId) === conversationId
   );
 
   const loadMore = useCallback(() => {
@@ -34,10 +34,14 @@ export const useMessages = (conversationId) => {
     if (!socket || !conversationId) return;
 
     const handleNewMessage = (data) => {
-      if (data.message.conversation === conversationId) {
-        addMessage(data.message);
+      // Backend may emit either { message: ... } or the message object directly
+      const message = data?.message || data;
+      const msgConversationId = message?.conversation || message?.conversationId;
+
+      if (msgConversationId === conversationId) {
+        addMessage(message);
         // Auto-mark as read if we're in this conversation
-        markAsRead(data.message._id);
+        if (message?._id) markAsRead(message._id);
       }
     };
 

@@ -118,15 +118,19 @@ export const useChatStore = create((set, get) => ({
   },
 
   addMessage: (message) => {
+    const msgConvId = message?.conversation || message?.conversationId;
+    const normalizedMessage =
+      message?.conversation ? message : { ...message, conversation: msgConvId };
+
     set((state) => ({
-      messages: [...state.messages, message],
+      messages: [...state.messages, normalizedMessage],
     }));
     
     // Update last message in conversation list
     set((state) => ({
       conversations: state.conversations.map((conv) =>
-        conv._id === message.conversation
-          ? { ...conv, lastMessage: message, updatedAt: new Date().toISOString() }
+        conv._id === msgConvId
+          ? { ...conv, lastMessage: normalizedMessage, updatedAt: new Date().toISOString() }
           : conv
       ).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)),
     }));
