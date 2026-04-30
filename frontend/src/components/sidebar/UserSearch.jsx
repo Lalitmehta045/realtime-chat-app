@@ -113,7 +113,7 @@ export const UserSearch = ({ onClose, onSelectUser }) => {
                       isOnline={user.isOnline}
                     />
                     <div className="flex-1 min-w-0">
-                      <h4 className="font-medium text-[var(--text-primary)] text-sm">
+                      <h4 className="font-medium text-[var(--text-primary)] text-sm truncate">
                         {user.username}
                       </h4>
                       <p className="text-xs text-[var(--text-muted)] truncate">

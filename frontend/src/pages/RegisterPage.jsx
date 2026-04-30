@@ -75,11 +75,11 @@ export const RegisterPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-violet-950 via-slate-900 to-black">
+    <div className="relative flex min-h-screen items-center justify-center overflow-y-auto bg-gradient-to-br from-violet-950 via-slate-900 to-black px-4 py-6 sm:px-6 sm:py-8">
       {/* Animated background elements */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <motion.div
-          className="absolute top-1/4 left-1/4 w-96 h-96 bg-violet-600/20 rounded-full blur-3xl"
+          className="absolute left-[12%] top-[18%] h-72 w-72 rounded-full bg-violet-600/20 blur-3xl sm:h-96 sm:w-96"
           animate={{ 
             scale: [1, 1.2, 1], 
             opacity: [0.3, 0.5, 0.3],
@@ -89,7 +89,7 @@ export const RegisterPage = () => {
           transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
         />
         <motion.div
-          className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-blue-600/20 rounded-full blur-3xl"
+          className="absolute bottom-[14%] right-[10%] h-64 w-64 rounded-full bg-blue-600/20 blur-3xl sm:h-80 sm:w-80"
           animate={{ 
             scale: [1.2, 1, 1.2], 
             opacity: [0.5, 0.3, 0.5],
@@ -107,21 +107,21 @@ export const RegisterPage = () => {
         transition={{ duration: 0.5, ease: "easeOut" }}
         className="w-full max-w-md relative z-10"
       >
-        <div className="glass rounded-2xl p-8 shadow-2xl">
+        <div className="glass rounded-[1.75rem] p-5 shadow-2xl sm:p-8">
           {/* Logo */}
           <motion.div 
-            className="flex items-center justify-center mb-6"
+            className="mb-5 flex items-center justify-center sm:mb-6"
             initial={{ y: -20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.2 }}
           >
-            <div className="w-16 h-16 gradient-primary rounded-2xl flex items-center justify-center shadow-lg shadow-violet-500/25">
-              <MessageCircle className="w-8 h-8 text-white" />
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl gradient-primary shadow-lg shadow-violet-500/25 sm:h-16 sm:w-16">
+              <MessageCircle className="h-7 w-7 text-white sm:h-8 sm:w-8" />
             </div>
           </motion.div>
 
           <motion.h1 
-            className="text-3xl font-bold text-center mb-2 text-gradient"
+            className="mb-2 text-center text-2xl font-bold text-gradient sm:text-3xl"
             initial={{ y: -10, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.3 }}
@@ -130,7 +130,7 @@ export const RegisterPage = () => {
           </motion.h1>
           
           <motion.p 
-            className="text-[var(--text-muted)] text-center mb-6"
+            className="mb-5 text-center text-sm text-[var(--text-muted)] sm:mb-6 sm:text-base"
             initial={{ y: -10, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.4 }}
@@ -144,10 +144,10 @@ export const RegisterPage = () => {
               initial={{ x: -20, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               transition={{ delay: 0.5 }}
-              className="flex justify-center mb-4"
+              className="mb-4 flex justify-center"
             >
               <label className="relative cursor-pointer group">
-                <div className="w-20 h-20 rounded-full overflow-hidden bg-[var(--bg-surface)] border-2 border-[var(--border-glass)] flex items-center justify-center group-hover:border-violet-500/50 transition-all">
+                <div className="flex h-[4.5rem] w-[4.5rem] items-center justify-center overflow-hidden rounded-full border-2 border-[var(--border-glass)] bg-[var(--bg-surface)] transition-all group-hover:border-violet-500/50 sm:h-20 sm:w-20">
                   {avatarPreview ? (
                     <img 
                       src={avatarPreview} 
@@ -155,10 +155,10 @@ export const RegisterPage = () => {
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <User className="w-8 h-8 text-[var(--text-muted)]" />
+                    <User className="h-7 w-7 text-[var(--text-muted)] sm:h-8 sm:w-8" />
                   )}
                 </div>
-                <div className="absolute bottom-0 right-0 w-7 h-7 gradient-primary rounded-full flex items-center justify-center shadow-lg">
+                <div className="absolute bottom-0 right-0 flex h-7 w-7 items-center justify-center rounded-full gradient-primary shadow-lg">
                   <Camera className="w-4 h-4 text-white" />
                 </div>
                 <input

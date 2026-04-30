@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Download, ZoomIn, ZoomOut } from 'lucide-react';
 import { useState } from 'react';
@@ -33,14 +34,13 @@ export const ImageLightbox = ({ imageUrl, isOpen, onClose }) => {
     document.body.removeChild(link);
   };
 
-  if (!isOpen || !imageUrl) return null;
-
-  return (
+  return createPortal(
     <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
+      {isOpen && imageUrl && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
         className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center"
         onClick={onClose}
       >
@@ -106,7 +106,9 @@ export const ImageLightbox = ({ imageUrl, isOpen, onClose }) => {
             Click image to reset zoom
           </div>
         )}
-      </motion.div>
-    </AnimatePresence>
+        </motion.div>
+      )}
+    </AnimatePresence>,
+    document.body
   );
 };

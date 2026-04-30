@@ -1,9 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import gsap from 'gsap';
 import { Sidebar } from '@components/sidebar/Sidebar';
 import { ChatWindow } from '@components/chat/ChatWindow';
 import { useChatStore } from '@store/useChatStore';
 import { useAuthStore } from '@store/useAuthStore';
+import { useResponsive } from '@hooks/useResponsive';
+import { useGsapAnimation, gsapAnimations } from '@hooks/useGsapAnimation';
 import { Avatar } from '@components/shared/Avatar';
 import axios from '@lib/axios';
 import toast from 'react-hot-toast';
@@ -11,11 +14,9 @@ import {
   ChevronRight,
   User,
   Lock,
-  Bell,
   Moon,
   Sun,
   Camera,
-  X,
   Check,
   Loader2,
   Eye,
@@ -197,7 +198,7 @@ const SettingsDrawer = ({ isOpen, onClose }) => {
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors ${
+                    className={`flex-1 flex items-center justify-center gap-1 px-1 py-3 text-xs font-medium transition-colors sm:gap-2 sm:text-sm ${
                       activeTab === tab.id
                         ? 'text-violet-400 border-b-2 border-violet-400'
                         : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
@@ -460,12 +461,15 @@ const SettingsDrawer = ({ isOpen, onClose }) => {
 export const HomePage = () => {
   const { selectedConversation, selectConversation } = useChatStore();
   const [showSettings, setShowSettings] = useState(false);
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
-  const [showSidebar, setShowSidebar] = useState(true);
+  const { isSmallScreen, isMediumScreen, isLargeScreen } = useResponsive();
+  const [isDesktop, setIsDesktop] = useState(() => window.innerWidth >= 1024);
+  const [showSidebar, setShowSidebar] = useState(() => window.innerWidth >= 1024 || !selectedConversation);
+  const prefersReducedMotion = useReducedMotion();
+  const containerRef = useRef(null);
 
   useEffect(() => {
     const handleResize = () => {
-      setIsMobile(window.innerWidth < 1024);
+      setIsDesktop(window.innerWidth >= 1024);
     };
 
     window.addEventListener('resize', handleResize);
@@ -473,14 +477,31 @@ export const HomePage = () => {
   }, []);
 
   useEffect(() => {
-    if (isMobile && selectedConversation) {
-      setShowSidebar(false);
+    if (isDesktop) {
+      setShowSidebar(true);
+      return;
     }
-  }, [selectedConversation, isMobile]);
+
+    setShowSidebar(!selectedConversation);
+  }, [isDesktop, selectedConversation]);
+
+  // GSAP animation for background elements
+  useEffect(() => {
+    const blobs = containerRef.current?.querySelectorAll('.blob-gradient');
+    if (blobs) {
+      gsap.to(blobs, {
+        duration: 20,
+        repeat: -1,
+        yoyo: true,
+        ease: 'sine.inOut',
+        opacity: (i) => [0.08, 0.1, 0.07][i],
+      });
+    }
+  }, []);
 
   const handleSelectConversation = (conversation) => {
     selectConversation(conversation);
-    if (isMobile) {
+    if (!isDesktop) {
       setShowSidebar(false);
     }
   };
@@ -490,48 +511,76 @@ export const HomePage = () => {
     setShowSidebar(true);
   };
 
-  return (
-    <div className="h-screen w-full flex overflow-hidden bg-[var(--bg-base)]">
-      {/* Sidebar */}
-      <AnimatePresence mode="wait">
-        {(!isMobile || showSidebar) && (
-          <motion.div
-            initial={isMobile ? { x: -300, opacity: 0 } : false}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: -300, opacity: 0 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className={`${isMobile ? 'absolute inset-0 z-20 w-full' : 'relative'} h-full`}
-          >
-            <Sidebar
-              onSelectConversation={handleSelectConversation}
-              selectedConversationId={selectedConversation?._id}
-              onOpenSettings={() => setShowSettings(true)}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
+  const showSidebarPane = isDesktop || showSidebar || !selectedConversation;
+  const showChatPane = isDesktop || (!!selectedConversation && !showSidebar);
+  const sidebarPaneTransition = prefersReducedMotion
+    ? { duration: 0.14, ease: 'easeOut' }
+    : { type: 'spring', stiffness: 300, damping: 30, mass: 0.75 };
+  const chatPaneTransition = prefersReducedMotion
+    ? { duration: 0.14, ease: 'easeOut' }
+    : { type: 'spring', stiffness: 320, damping: 32, mass: 0.72 };
 
-      {/* Chat Window */}
-      <AnimatePresence mode="wait">
-        {(!isMobile || !showSidebar) && (
-          <motion.div
-            initial={isMobile ? { x: 300, opacity: 0 } : false}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: 300, opacity: 0 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="flex-1 h-full"
-          >
-            <ChatWindow 
-              onBack={isMobile ? handleBack : undefined}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
+  return (
+    <div ref={containerRef} className="relative min-h-dvh w-full overflow-hidden bg-[var(--bg-base)] transition-colors duration-300">
+      {/* Animated Background Gradients */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="blob-gradient absolute -left-16 top-0 h-56 w-56 rounded-full bg-cyan-400/10 blur-3xl" />
+        <div className="blob-gradient absolute right-0 top-12 h-72 w-72 rounded-full bg-violet-500/12 blur-3xl" />
+        <div className="blob-gradient absolute bottom-0 left-1/3 h-64 w-64 rounded-full bg-sky-500/10 blur-3xl" />
+      </div>
+
+      {/* Main Content Container */}
+      <div className="relative mx-auto flex h-dvh w-full overflow-hidden">
+        {/* Card Container with improved responsive styling */}
+        <div className="relative flex h-full w-full flex-col lg:flex-row overflow-hidden bg-[var(--bg-surface)] backdrop-blur-md transition-colors duration-300">
+          <AnimatePresence initial={false} mode="wait">
+            {showSidebarPane && (
+              <motion.aside
+                key="sidebar-pane"
+                initial={isDesktop ? false : { x: '-100%', opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                exit={isDesktop ? undefined : { x: '-100%', opacity: 0 }}
+                transition={sidebarPaneTransition}
+                className={`${
+                  isDesktop
+                    ? 'relative z-10 h-full w-[clamp(19rem,28vw,24rem)] shrink-0 border-r border-[var(--border-glass)]'
+                    : 'absolute inset-0 z-30 h-full w-full bg-[var(--bg-base)]'
+                }`}
+                style={{ willChange: 'transform, opacity' }}
+              >
+                <Sidebar
+                  onSelectConversation={handleSelectConversation}
+                  selectedConversationId={selectedConversation?._id}
+                  onOpenSettings={() => setShowSettings(true)}
+                />
+              </motion.aside>
+            )}
+          </AnimatePresence>
+
+          <AnimatePresence initial={false} mode="wait">
+            {showChatPane && (
+              <motion.main
+                key="chat-pane"
+                initial={isDesktop ? false : { x: '100%', opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                exit={isDesktop ? undefined : { x: '100%', opacity: 0 }}
+                transition={chatPaneTransition}
+                className={`${
+                  isDesktop ? 'relative flex-1' : 'absolute inset-0 z-20'
+                } h-full min-w-0`}
+                style={{ willChange: 'transform, opacity' }}
+              >
+                <ChatWindow onBack={isDesktop ? undefined : handleBack} />
+              </motion.main>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
 
       {/* Settings Drawer */}
-      <SettingsDrawer 
-        isOpen={showSettings} 
-        onClose={() => setShowSettings(false)} 
+      <SettingsDrawer
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
       />
     </div>
   );

@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useEffect } from 'react';
+import { motion } from 'framer-motion';
 import { Toaster } from 'react-hot-toast';
 import { useAuthStore } from '@store/useAuthStore';
 import { ProtectedRoute } from '@components/shared/ProtectedRoute';
@@ -7,16 +8,31 @@ import { LoginPage } from '@pages/LoginPage';
 import { RegisterPage } from '@pages/RegisterPage';
 import { HomePage } from '@pages/HomePage';
 
+// Professional loading spinner
+const LoadingSpinner = () => (
+  <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+    <motion.div
+      className="w-12 h-12 border-3 border-violet-500/30 border-t-violet-500 rounded-full"
+      animate={{ rotate: 360 }}
+      transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+    />
+    <motion.p
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.2 }}
+      className="mt-4 text-sm text-gray-400 font-medium"
+    >
+      Loading...
+    </motion.p>
+  </div>
+);
+
 // Auth redirect wrapper
 const AuthRedirect = ({ children }) => {
   const { authUser, isCheckingAuth } = useAuthStore();
   
   if (isCheckingAuth) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="w-8 h-8 border-4 border-violet-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+    return <LoadingSpinner />;
   }
   
   if (authUser) {

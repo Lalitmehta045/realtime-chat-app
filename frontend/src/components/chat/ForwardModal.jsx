@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Search, Loader2, Send, Inbox } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -75,7 +76,7 @@ export const ForwardModal = ({ message, onClose }) => {
       const count = data?.forwardedCount ?? selected.size;
       toast.success(`Message forwarded to ${count} conversation(s)`);
       onClose?.();
-    } catch (e) {
+    } catch (error) {
       toast.error('Failed to forward message');
     } finally {
       setLoading(false);
@@ -90,7 +91,7 @@ export const ForwardModal = ({ message, onClose }) => {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [onClose]);
 
-  return (
+  return createPortal(
     <AnimatePresence>
       <motion.div
         className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -233,7 +234,8 @@ export const ForwardModal = ({ message, onClose }) => {
           </div>
         </motion.div>
       </motion.div>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 };
 

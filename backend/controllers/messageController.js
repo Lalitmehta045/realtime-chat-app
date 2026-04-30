@@ -1,51 +1,67 @@
-const { validationResult, body, query } = require('express-validator');
-const Message = require('../models/Message');
-const Conversation = require('../models/Conversation');
-const { uploadToCloudinary } = require('../middleware/uploadMiddleware');
+const { validationResult, body } = require("express-validator");
+const Message = require("../models/Message");
+const Conversation = require("../models/Conversation");
+const { uploadToCloudinary } = require("../middleware/uploadMiddleware");
 
-// Validation rules
+const populateMessageForClient = (messageId) =>
+  Message.findById(messageId)
+    .populate("senderId", "username profilePicture")
+    .populate("reactions.userId", "username profilePicture");
+
+const applyReactionChange = (message, userId, emoji) => {
+  const normalizedUserId = userId.toString();
+  const existingReactionIndex = message.reactions.findIndex(
+    (reaction) => reaction.userId.toString() === normalizedUserId,
+  );
+
+  if (existingReactionIndex === -1) {
+    message.reactions.push({ userId, emoji });
+    return;
+  }
+
+  const existingReaction = message.reactions[existingReactionIndex];
+  if (existingReaction.emoji === emoji) {
+    message.reactions.splice(existingReactionIndex, 1);
+    return;
+  }
+
+  existingReaction.emoji = emoji;
+};
+
 const sendMessageValidation = [
-  body('conversationId')
-    .notEmpty()
-    .withMessage('Conversation ID is required'),
-  body('text')
-    .optional()
-    .trim()
-    .notEmpty()
-    .withMessage('Text cannot be empty'),
+  body("conversationId").notEmpty().withMessage("Conversation ID is required"),
+  body("text").optional().trim().notEmpty().withMessage("Text cannot be empty"),
 ];
 
-// Get messages for a conversation
 const getMessages = async (req, res) => {
   try {
     const { conversationId } = req.params;
-    const page = parseInt(req.query.page) || 1;
+    const page = parseInt(req.query.page, 10) || 1;
     const limit = 20;
     const skip = (page - 1) * limit;
     const userId = req.user._id;
 
-    // Verify user is a participant
     const conversation = await Conversation.findOne({
       _id: conversationId,
       participants: userId,
     });
 
     if (!conversation) {
-      return res.status(403).json({ message: 'Not authorized to view this conversation' });
+      return res
+        .status(403)
+        .json({ message: "Not authorized to view this conversation" });
     }
 
-    // Get messages, excluding ones deleted for this user
     const messages = await Message.find({
       conversationId,
       deletedFor: { $ne: userId },
     })
-      .populate('senderId', 'username profilePicture')
-      .populate('reactions.userId', 'username profilePicture')
+      .populate("senderId", "username profilePicture")
+      .populate("reactions.userId", "username profilePicture")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
 
-    // Get total count for pagination
     const totalMessages = await Message.countDocuments({
       conversationId,
       deletedFor: { $ne: userId },
@@ -53,19 +69,17 @@ const getMessages = async (req, res) => {
 
     const hasMore = skip + messages.length < totalMessages;
 
-    // Return in ascending order (oldest first) for display
     res.json({
       messages: messages.reverse(),
       hasMore,
       page,
     });
   } catch (error) {
-    console.error('Get messages error:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.error("Get messages error:", error);
+    res.status(500).json({ message: "Server error" });
   }
 };
 
-// Send new message
 const sendMessage = async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -76,52 +90,51 @@ const sendMessage = async (req, res) => {
     let { conversationId, text, replyTo } = req.body;
     const userId = req.user._id;
 
-    if (typeof replyTo === 'string') {
+    if (typeof replyTo === "string") {
       try {
         replyTo = JSON.parse(replyTo);
-      } catch (e) {
-        return res.status(400).json({ message: 'Invalid replyTo payload' });
+      } catch {
+        return res.status(400).json({ message: "Invalid replyTo payload" });
       }
     }
 
     if (replyTo) {
-      const hasRequired =
-        replyTo.messageId &&
-        replyTo.senderId &&
-        replyTo.senderName;
+      const hasRequiredFields =
+        replyTo.messageId && replyTo.senderId && replyTo.senderName;
 
-      if (!hasRequired) {
+      if (!hasRequiredFields) {
         return res.status(400).json({
-          message: 'replyTo.messageId, replyTo.senderId, and replyTo.senderName are required',
+          message:
+            "replyTo.messageId, replyTo.senderId, and replyTo.senderName are required",
         });
       }
     }
 
-    // Verify user is a participant
     const conversation = await Conversation.findOne({
       _id: conversationId,
       participants: userId,
     });
 
     if (!conversation) {
-      return res.status(403).json({ message: 'Not authorized to send messages here' });
+      return res
+        .status(403)
+        .json({ message: "Not authorized to send messages here" });
     }
 
     let imageUrl = null;
-    let messageType = 'text';
+    let messageType = "text";
 
-    // Handle image upload
     if (req.file) {
-      imageUrl = await uploadToCloudinary(req.file.buffer, 'chat/messages');
-      messageType = text ? 'mixed' : 'image';
+      imageUrl = await uploadToCloudinary(req.file.buffer, "chat/messages");
+      messageType = text ? "mixed" : "image";
     }
 
-    // At least one of text or image required
     if (!text && !imageUrl) {
-      return res.status(400).json({ message: 'Message must contain text or image' });
+      return res
+        .status(400)
+        .json({ message: "Message must contain text or image" });
     }
 
-    // Create message
     const message = await Message.create({
       conversationId,
       senderId: userId,
@@ -130,53 +143,44 @@ const sendMessage = async (req, res) => {
       messageType,
       replyTo: replyTo
         ? {
-            messageId: replyTo.messageId,
-            senderId: replyTo.senderId,
-            senderName: replyTo.senderName,
-            text: replyTo.text || null,
-            image: replyTo.image || null,
-            messageType: replyTo.messageType || 'text',
-          }
+          messageId: replyTo.messageId,
+          senderId: replyTo.senderId,
+          senderName: replyTo.senderName,
+          text: replyTo.text || null,
+          image: replyTo.image || null,
+          messageType: replyTo.messageType || "text",
+        }
         : null,
     });
 
-    // Update conversation lastMessage and timestamp
+    const otherParticipants = conversation.participants.filter(
+      (participantId) => participantId.toString() !== userId.toString(),
+    );
+
+    const unreadIncrement = {};
+    otherParticipants.forEach((participantId) => {
+      unreadIncrement[`unreadCount.${participantId}`] = 1;
+    });
+
     await Conversation.findByIdAndUpdate(conversationId, {
       lastMessage: message._id,
       updatedAt: new Date(),
+      $set: { [`unreadCount.${userId}`]: 0 },
+      ...(Object.keys(unreadIncrement).length ? { $inc: unreadIncrement } : {}),
     });
 
-    // Reset unread for sender, increment for others
-    const otherParticipants = conversation.participants.filter(
-      p => p.toString() !== userId.toString()
-    );
+    const populatedMessage = await populateMessageForClient(message._id);
+    const io = req.app.get("io");
 
-    const unreadUpdate = {};
-    unreadUpdate[`unreadCount.${userId}`] = 0;
-    otherParticipants.forEach(p => {
-      unreadUpdate[`unreadCount.${p}`] = (conversation.unreadCount?.get?.(p.toString()) || 0) + 1;
-    });
-
-    await Conversation.findByIdAndUpdate(conversationId, {
-      $set: unreadUpdate,
-    });
-
-    // Populate and emit
-    const populatedMessage = await Message.findById(message._id)
-      .populate('senderId', 'username profilePicture');
-
-    // Emit to conversation room via Socket.io
-    const io = req.app.get('io');
-    io.to(conversationId).emit('new_message', populatedMessage);
+    io.to(conversationId).emit("new_message", populatedMessage);
 
     res.status(201).json({ message: populatedMessage });
   } catch (error) {
-    console.error('Send message error:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.error("Send message error:", error);
+    res.status(500).json({ message: "Server error" });
   }
 };
 
-// Edit message
 const editMessage = async (req, res) => {
   try {
     const { id } = req.params;
@@ -186,23 +190,24 @@ const editMessage = async (req, res) => {
     const message = await Message.findById(id);
 
     if (!message) {
-      return res.status(404).json({ message: 'Message not found' });
+      return res.status(404).json({ message: "Message not found" });
     }
 
-    // Check sender
     if (message.senderId.toString() !== userId.toString()) {
-      return res.status(403).json({ message: 'Can only edit your own messages' });
+      return res
+        .status(403)
+        .json({ message: "Can only edit your own messages" });
     }
 
-    // Check if deleted
     if (message.isDeleted) {
-      return res.status(400).json({ message: 'Cannot edit deleted message' });
+      return res.status(400).json({ message: "Cannot edit deleted message" });
     }
 
-    // Check edit window (5 minutes)
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
     if (message.createdAt < fiveMinutesAgo) {
-      return res.status(400).json({ message: 'Edit window expired (5 minutes)' });
+      return res
+        .status(400)
+        .json({ message: "Edit window expired (5 minutes)" });
     }
 
     message.text = text;
@@ -210,21 +215,18 @@ const editMessage = async (req, res) => {
     message.editedAt = new Date();
     await message.save();
 
-    const populatedMessage = await Message.findById(id)
-      .populate('senderId', 'username profilePicture');
+    const populatedMessage = await populateMessageForClient(id);
+    const io = req.app.get("io");
 
-    // Emit via socket
-    const io = req.app.get('io');
-    io.to(message.conversationId.toString()).emit('message_edited', populatedMessage);
+    io.to(message.conversationId.toString()).emit("message_edited", populatedMessage);
 
     res.json({ message: populatedMessage });
   } catch (error) {
-    console.error('Edit message error:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.error("Edit message error:", error);
+    res.status(500).json({ message: "Server error" });
   }
 };
 
-// Delete message
 const deleteMessage = async (req, res) => {
   try {
     const { id } = req.params;
@@ -234,68 +236,63 @@ const deleteMessage = async (req, res) => {
     const message = await Message.findById(id);
 
     if (!message) {
-      return res.status(404).json({ message: 'Message not found' });
+      return res.status(404).json({ message: "Message not found" });
     }
 
-    // Verify user is a participant in the conversation
     const conversation = await Conversation.findOne({
       _id: message.conversationId,
       participants: userId,
     });
 
     if (!conversation) {
-      return res.status(403).json({ message: 'Not authorized' });
+      return res.status(403).json({ message: "Not authorized" });
     }
 
-    // Check if user is sender for 'everyone' delete
     const isSender = message.senderId.toString() === userId.toString();
+    const io = req.app.get("io");
 
-    if (deleteFor === 'everyone') {
+    if (deleteFor === "everyone") {
       if (!isSender) {
-        return res.status(403).json({ message: 'Only sender can delete for everyone' });
+        return res
+          .status(403)
+          .json({ message: "Only sender can delete for everyone" });
       }
 
-      // Soft delete
       message.isDeleted = true;
       message.text = null;
       message.image = null;
       message.deletedAt = new Date();
       await message.save();
 
-      // Emit via socket
-      const io = req.app.get('io');
-      io.to(message.conversationId.toString()).emit('message_deleted', {
+      io.to(message.conversationId.toString()).emit("message_deleted", {
         messageId: id,
-        deleteFor: 'everyone',
+        deleteFor: "everyone",
       });
     } else {
-      // Delete for me only - add to deletedFor array
       if (!message.deletedFor.includes(userId)) {
         message.deletedFor.push(userId);
         await message.save();
       }
 
-      // Emit via socket (only to the user who deleted)
-      const io = req.app.get('io');
       const userSocket = Array.from(io.sockets.sockets.values()).find(
-        s => s.userId === userId.toString()
+        (socket) => socket.userId === userId.toString(),
       );
+
       if (userSocket) {
-        userSocket.emit('message_deleted', {
+        userSocket.emit("message_deleted", {
           messageId: id,
-          deleteFor: 'me',
+          deleteFor: "me",
         });
       }
     }
 
     res.json({ success: true });
   } catch (error) {
-    console.error('Delete message error:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.error("Delete message error:", error);
+    res.status(500).json({ message: "Server error" });
   }
 };
 
-// Add/remove reaction
 const reactToMessage = async (req, res) => {
   try {
     const { id } = req.params;
@@ -305,154 +302,131 @@ const reactToMessage = async (req, res) => {
     const message = await Message.findById(id);
 
     if (!message) {
-      return res.status(404).json({ message: 'Message not found' });
+      return res.status(404).json({ message: "Message not found" });
     }
 
-    // Verify user is a participant
     const conversation = await Conversation.findOne({
       _id: message.conversationId,
       participants: userId,
     });
 
     if (!conversation) {
-      return res.status(403).json({ message: 'Not authorized' });
+      return res.status(403).json({ message: "Not authorized" });
     }
 
-    // Check if user already reacted with this emoji
-    const existingReactionIndex = message.reactions.findIndex(
-      r => r.userId.toString() === userId.toString()
-    );
-
-    if (existingReactionIndex !== -1) {
-      const existingReaction = message.reactions[existingReactionIndex];
-      
-      if (existingReaction.emoji === emoji) {
-        // Remove reaction (toggle off)
-        message.reactions.splice(existingReactionIndex, 1);
-      } else {
-        // Replace with new emoji
-        existingReaction.emoji = emoji;
-      }
-    } else {
-      // Add new reaction
-      message.reactions.push({ userId, emoji });
-    }
-
+    applyReactionChange(message, userId, emoji);
     await message.save();
 
-    // Emit via socket
-    const io = req.app.get('io');
-    io.to(message.conversationId.toString()).emit('reaction_updated', {
-      messageId: id,
-      reactions: message.reactions,
-    });
+    const updatedMessage = await populateMessageForClient(id);
+    const io = req.app.get("io");
 
-    res.json({ reactions: message.reactions });
+    io.to(message.conversationId.toString()).emit("reaction_updated", updatedMessage);
+
+    res.json({
+      message: updatedMessage,
+      reactions: updatedMessage.reactions,
+    });
   } catch (error) {
-    console.error('React to message error:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.error("React to message error:", error);
+    res.status(500).json({ message: "Server error" });
   }
 };
 
-// Search messages
 const searchMessages = async (req, res) => {
   try {
     const { conversationId, q } = req.query;
     const userId = req.user._id;
 
     if (!conversationId || !q) {
-      return res.status(400).json({ message: 'Conversation ID and search query required' });
+      return res
+        .status(400)
+        .json({ message: "Conversation ID and search query required" });
     }
 
-    // Verify user is a participant
     const conversation = await Conversation.findOne({
       _id: conversationId,
       participants: userId,
     });
 
     if (!conversation) {
-      return res.status(403).json({ message: 'Not authorized to search this conversation' });
+      return res
+        .status(403)
+        .json({ message: "Not authorized to search this conversation" });
     }
 
-    // Text search using MongoDB text index
     const messages = await Message.find({
       conversationId,
       $text: { $search: q },
       deletedFor: { $ne: userId },
     })
-      .populate('senderId', 'username profilePicture')
-      .sort({ score: { $meta: 'textScore' } })
+      .populate("senderId", "username profilePicture")
+      .populate("reactions.userId", "username profilePicture")
+      .sort({ score: { $meta: "textScore" } })
       .limit(20);
 
     res.json({ messages });
   } catch (error) {
-    console.error('Search messages error:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.error("Search messages error:", error);
+    res.status(500).json({ message: "Server error" });
   }
 };
 
-// Forward a message to up to 5 conversations
 const forwardMessage = async (req, res) => {
   try {
     const { messageId, conversationIds } = req.body;
     const senderId = req.user._id;
 
-    // ── Validation ──────────────────────────────
     if (!messageId || !conversationIds?.length) {
-      return res.status(400).json({
-        error: 'messageId and conversationIds required',
-      });
+      return res
+        .status(400)
+        .json({ error: "messageId and conversationIds required" });
     }
 
     if (conversationIds.length > 5) {
-      return res.status(400).json({
-        error: 'Cannot forward to more than 5 conversations',
-      });
+      return res
+        .status(400)
+        .json({ error: "Cannot forward to more than 5 conversations" });
     }
 
-    // ── Find original message ────────────────────
     const original = await Message.findById(messageId);
     if (!original) {
-      return res.status(404).json({
-        error: 'Original message not found',
-      });
-    }
-    if (original.isDeleted) {
-      return res.status(400).json({
-        error: 'Cannot forward a deleted message',
-      });
+      return res.status(404).json({ error: "Original message not found" });
     }
 
-    // ── Verify sender is participant of source ───
-    const sourceConv = await Conversation.findOne({
+    if (original.isDeleted) {
+      return res
+        .status(400)
+        .json({ error: "Cannot forward a deleted message" });
+    }
+
+    const sourceConversation = await Conversation.findOne({
       _id: original.conversationId,
       participants: senderId,
     });
-    if (!sourceConv) {
-      return res.status(403).json({
-        error: 'Not a participant of source conversation',
-      });
+
+    if (!sourceConversation) {
+      return res
+        .status(403)
+        .json({ error: "Not a participant of source conversation" });
     }
 
-    // ── Verify sender is participant of each target
-    const targetConvs = await Conversation.find({
+    const targetConversations = await Conversation.find({
       _id: { $in: conversationIds },
       participants: senderId,
     });
 
-    if (targetConvs.length !== conversationIds.length) {
+    if (targetConversations.length !== conversationIds.length) {
       return res.status(403).json({
-        error: 'Not a participant in one or more target conversations',
+        error: "Not a participant in one or more target conversations",
       });
     }
 
-    // ── Create forwarded copies ──────────────────
-    const io = req.app.get('io');
+    const io = req.app.get("io");
     const createdMessages = [];
 
-    for (const conv of targetConvs) {
-      const forwarded = await Message.create({
-        conversationId: conv._id,
+    for (const conversation of targetConversations) {
+      const forwardedMessage = await Message.create({
+        conversationId: conversation._id,
         senderId,
         text: original.text || null,
         image: original.image || null,
@@ -461,37 +435,26 @@ const forwardMessage = async (req, res) => {
         forwardedFrom: original._id,
       });
 
-      // Update conversation lastMessage + updatedAt
-      await Conversation.findByIdAndUpdate(conv._id, {
-        lastMessage: forwarded._id,
+      const otherParticipants = conversation.participants.filter(
+        (participantId) => participantId.toString() !== senderId.toString(),
+      );
+
+      const unreadIncrement = {};
+      otherParticipants.forEach((participantId) => {
+        unreadIncrement[`unreadCount.${participantId}`] = 1;
+      });
+
+      await Conversation.findByIdAndUpdate(conversation._id, {
+        lastMessage: forwardedMessage._id,
         updatedAt: new Date(),
-      });
-
-      // Increment unreadCount for all participants except the sender
-      const others = conv.participants.filter(
-        p => p.toString() !== senderId.toString()
-      );
-
-      const inc = {};
-      others.forEach(participantId => {
-        inc[`unreadCount.${participantId}`] = 1;
-      });
-
-      await Conversation.findByIdAndUpdate(conv._id, {
         $set: { [`unreadCount.${senderId}`]: 0 },
-        ...(Object.keys(inc).length ? { $inc: inc } : {}),
+        ...(Object.keys(unreadIncrement).length ? { $inc: unreadIncrement } : {}),
       });
 
-      // Populate senderId before emitting
-      const populated = await Message.findById(forwarded._id).populate(
-        'senderId',
-        'username profilePicture'
-      );
+      const populatedMessage = await populateMessageForClient(forwardedMessage._id);
 
-      // Emit to conversation room via Socket.io
-      io.to(conv._id.toString()).emit('new_message', populated);
-
-      createdMessages.push(populated);
+      io.to(conversation._id.toString()).emit("new_message", populatedMessage);
+      createdMessages.push(populatedMessage);
     }
 
     return res.status(201).json({
@@ -499,11 +462,9 @@ const forwardMessage = async (req, res) => {
       forwardedCount: createdMessages.length,
       messages: createdMessages,
     });
-  } catch (err) {
-    console.error('forwardMessage error:', err);
-    return res.status(500).json({
-      error: 'Internal server error',
-    });
+  } catch (error) {
+    console.error("forwardMessage error:", error);
+    return res.status(500).json({ error: "Internal server error" });
   }
 };
 

@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Users, Camera, Search, Check, Loader2 } from 'lucide-react';
 import { Avatar } from '@components/shared/Avatar';
@@ -91,12 +92,11 @@ export const GroupCreateModal = ({ isOpen, onClose }) => {
     }
   };
 
-  if (!isOpen) return null;
-
-  return (
+  return createPortal(
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        {/* Backdrop */}
+      {isOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          {/* Backdrop */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -255,7 +255,9 @@ export const GroupCreateModal = ({ isOpen, onClose }) => {
             </button>
           </div>
         </motion.div>
-      </div>
-    </AnimatePresence>
+        </div>
+      )}
+    </AnimatePresence>,
+    document.body
   );
 };

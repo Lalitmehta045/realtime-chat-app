@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useChatStore } from '@store/useChatStore';
 import { getSocket, emitMessageRead } from '@lib/socket';
 
@@ -7,7 +7,6 @@ export const useMessages = (conversationId) => {
     messages,
     getMessages,
     addMessage,
-    updateMessage,
     setTyping,
     hasMoreMessages,
     isLoadingMessages,

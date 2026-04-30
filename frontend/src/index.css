@@ -1,4 +1,6 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
 @import "tailwindcss";
+@import "./styles/professional.css";
 
 /* Hide browser's default password reveal button */
 input[type="password"]::-ms-reveal,
@@ -31,47 +33,79 @@ input[type="password"] {
 
 @theme {
   /* CSS variables */
-  --color-bg-base: #0F0F13;
-  --color-bg-surface: rgba(255, 255, 255, 0.05);
-  --color-bg-surface-2: rgba(255, 255, 255, 0.08);
-  --color-border-glass: rgba(255, 255, 255, 0.10);
-  --color-text-primary: #F5F5F5;
-  --color-text-muted: #9CA3AF;
-  --color-accent-purple: #A78BFA;
+  --color-bg-base: var(--bg-base);
+  --color-bg-surface: var(--bg-surface);
+  --color-bg-surface-2: var(--bg-surface-2);
+  --color-border-glass: var(--border-glass);
+  --color-text-primary: var(--text-primary);
+  --color-text-muted: var(--text-muted);
+  --color-accent-purple: var(--accent-purple);
 }
 
 /* Dark mode (default) */
 :root {
-  --bg-base: #0F0F13;
-  --bg-surface: rgba(255, 255, 255, 0.05);
-  --bg-surface-2: rgba(255, 255, 255, 0.08);
-  --border-glass: rgba(255, 255, 255, 0.10);
-  --text-primary: #F5F5F5;
-  --text-muted: #9CA3AF;
-  --accent-purple: #A78BFA;
+  --bg-base: #0B0C10;
+  --bg-surface: #13151A;
+  --bg-surface-2: #1C1E26;
+  --border-glass: rgba(255, 255, 255, 0.06);
+  --text-primary: #FFFFFF;
+  --text-muted: #8E929C;
+  --accent-purple: #4F46E5;
+  --message-sent: linear-gradient(135deg, #4F46E5, #3B82F6);
+  --message-received: #1C1E26;
+  --message-sent-text: #FFFFFF;
+  --message-received-text: #FFFFFF;
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
 }
 
 /* Light mode */
 .light {
-  --bg-base: #F8F9FA;
-  --bg-surface: rgba(0, 0, 0, 0.03);
-  --bg-surface-2: rgba(0, 0, 0, 0.06);
+  --bg-base: #F8FAFC;
+  --bg-surface: #FFFFFF;
+  --bg-surface-2: #F1F5F9;
   --border-glass: rgba(0, 0, 0, 0.08);
-  --text-primary: #1F2937;
-  --text-muted: #6B7280;
+  --text-primary: #0F172A;
+  --text-muted: #64748B;
+  --accent-purple: #4F46E5;
+  --message-sent: linear-gradient(135deg, #4F46E5, #3B82F6);
+  --message-received: #FFFFFF;
+  --message-sent-text: #FFFFFF;
+  --message-received-text: #0F172A;
+  --glass-shadow: 0 8px 32px 0 rgba(148, 163, 184, 0.15);
 }
 
 /* Base styles */
 * {
+  box-sizing: border-box;
+  min-width: 0;
   border-color: var(--border-glass);
 }
 
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+html {
+  height: 100%;
+}
+
 body {
+  margin: 0;
   background-color: var(--bg-base);
   color: var(--text-primary);
+  font-family: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  font-feature-settings: "rlig" 1, "calt" 1;
+}
+
+img,
+svg,
+video,
+canvas {
+  display: block;
+  max-width: 100%;
 }
 
 /* Glassmorphism utilities */
@@ -88,11 +122,11 @@ body {
 }
 
 .gradient-primary {
-  background: linear-gradient(135deg, #7C3AED, #3B82F6);
+  background: linear-gradient(135deg, #4F46E5, #3B82F6);
 }
 
 .text-gradient {
-  background: linear-gradient(135deg, #A78BFA, #60A5FA);
+  background: linear-gradient(135deg, #818CF8, #60A5FA);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -115,6 +149,15 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-muted);
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }
 
 /* Hide browser's default password reveal button */

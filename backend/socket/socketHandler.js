@@ -1,183 +1,189 @@
-const jwt = require('jsonwebtoken');
-const User = require('../models/User');
-const Conversation = require('../models/Conversation');
-const Message = require('../models/Message');
+const jwt = require("jsonwebtoken");
+const User = require("../models/User");
+const Conversation = require("../models/Conversation");
+const Message = require("../models/Message");
 
-// Map to track online users: userId -> socketId
 const onlineUsers = new Map();
 
-module.exports = function (io) {
-  // Socket authentication middleware
+const populateMessageForClient = (messageId) =>
+  Message.findById(messageId)
+    .populate("senderId", "username profilePicture")
+    .populate("reactions.userId", "username profilePicture");
+
+const applyReactionChange = (message, userId, emoji) => {
+  const normalizedUserId = userId.toString();
+  const existingReactionIndex = message.reactions.findIndex(
+    (reaction) => reaction.userId.toString() === normalizedUserId,
+  );
+
+  if (existingReactionIndex === -1) {
+    message.reactions.push({ userId, emoji });
+    return;
+  }
+
+  const existingReaction = message.reactions[existingReactionIndex];
+  if (existingReaction.emoji === emoji) {
+    message.reactions.splice(existingReactionIndex, 1);
+    return;
+  }
+
+  existingReaction.emoji = emoji;
+};
+
+module.exports = function socketHandler(io) {
   io.use(async (socket, next) => {
     try {
       const token = socket.handshake.auth.token;
 
       if (!token) {
-        return next(new Error('Authentication error: No token provided'));
+        return next(new Error("Authentication error: No token provided"));
       }
 
       const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
       socket.userId = decoded.userId;
       next();
-    } catch (error) {
-      next(new Error('Authentication error: Invalid token'));
+    } catch {
+      next(new Error("Authentication error: Invalid token"));
     }
   });
 
-  io.on('connection', async (socket) => {
+  io.on("connection", async (socket) => {
     const userId = socket.userId;
     console.log(`User connected: ${userId}`);
 
     try {
-      // Set user online status
       await User.findByIdAndUpdate(userId, {
         isOnline: true,
         lastSeen: new Date(),
       });
 
-      // Add to online users map
       onlineUsers.set(userId, socket.id);
 
-      // Broadcast user online status to all clients
-      socket.broadcast.emit('user_online', userId);
+      socket.broadcast.emit("user_online", userId);
+      socket.emit("online_users", Array.from(onlineUsers.keys()));
 
-      // Send list of online users to the connected user
-      socket.emit('online_users', Array.from(onlineUsers.keys()));
-
-      // Handle join conversation
-      socket.on('join_conversation', async (conversationId) => {
+      socket.on("join_conversation", async (conversationId) => {
         try {
-          // Verify user is a participant
           const conversation = await Conversation.findOne({
             _id: conversationId,
             participants: userId,
           });
 
-          if (conversation) {
-            socket.join(conversationId);
-            console.log(`User ${userId} joined conversation ${conversationId}`);
-          }
+          if (!conversation) return;
+
+          socket.join(conversationId);
+          console.log(`User ${userId} joined conversation ${conversationId}`);
         } catch (error) {
-          console.error('Join conversation error:', error);
+          console.error("Join conversation error:", error);
         }
       });
 
-      // Handle leave conversation
-      socket.on('leave_conversation', (conversationId) => {
+      socket.on("leave_conversation", (conversationId) => {
         socket.leave(conversationId);
         console.log(`User ${userId} left conversation ${conversationId}`);
       });
 
-      // Handle typing start
-      socket.on('typing_start', ({ conversationId }) => {
-        socket.to(conversationId).emit('user_typing', {
+      socket.on("typing_start", ({ conversationId }) => {
+        socket.to(conversationId).emit("user_typing", {
           userId,
           conversationId,
         });
       });
 
-      // Handle typing stop
-      socket.on('typing_stop', ({ conversationId }) => {
-        socket.to(conversationId).emit('user_stop_typing', {
+      socket.on("typing_stop", ({ conversationId }) => {
+        socket.to(conversationId).emit("user_stop_typing", {
           userId,
           conversationId,
         });
       });
 
-      // Handle message read
-      socket.on('message_read', async ({ messageId, conversationId }) => {
+      socket.on("message_read", async ({ messageId, conversationId }) => {
         try {
-          // Update message
-          await Message.findByIdAndUpdate(messageId, {
-            $addToSet: { readBy: userId },
-            isRead: true,
+          const conversation = await Conversation.findOne({
+            _id: conversationId,
+            participants: userId,
           });
 
-          // Broadcast to conversation room
-          socket.to(conversationId).emit('message_seen', {
+          if (!conversation) return;
+
+          const updatedMessage = await Message.findOneAndUpdate(
+            {
+              _id: messageId,
+              conversationId,
+            },
+            {
+              $addToSet: { readBy: userId },
+              $set: { isRead: true },
+            },
+            { new: true },
+          );
+
+          if (!updatedMessage) return;
+
+          io.to(conversationId).emit("message_seen", {
             messageId,
-            userId,
+            conversationId,
+            readBy: updatedMessage.readBy,
+            isRead: updatedMessage.isRead,
           });
 
-          // Reset unread count for this user in conversation
           await Conversation.findByIdAndUpdate(conversationId, {
             $set: { [`unreadCount.${userId}`]: 0 },
           });
         } catch (error) {
-          console.error('Message read error:', error);
+          console.error("Message read error:", error);
         }
       });
 
-      // Handle add reaction
-      socket.on('add_reaction', async ({ messageId, emoji }) => {
+      socket.on("add_reaction", async ({ messageId, emoji }, callback = () => {}) => {
         try {
           const message = await Message.findById(messageId);
-          if (!message) return;
 
-          // Verify user is a participant
+          if (!message) {
+            callback({ success: false, message: "Message not found" });
+            return;
+          }
+
           const conversation = await Conversation.findOne({
             _id: message.conversationId,
             participants: userId,
           });
-          if (!conversation) return;
 
-          // Check if user already reacted with this emoji
-          const existingReactionIndex = message.reactions.findIndex(
-            r => r.userId.toString() === userId.toString() && r.emoji === emoji
-          );
-
-          if (existingReactionIndex !== -1) {
-            // Remove reaction (toggle off)
-            message.reactions.splice(existingReactionIndex, 1);
-          } else {
-            // Remove any existing reaction from this user
-            const userReactionIndex = message.reactions.findIndex(
-              r => r.userId.toString() === userId.toString()
-            );
-            if (userReactionIndex !== -1) {
-              message.reactions.splice(userReactionIndex, 1);
-            }
-            // Add new reaction
-            message.reactions.push({ userId, emoji });
+          if (!conversation) {
+            callback({ success: false, message: "Not authorized" });
+            return;
           }
 
+          applyReactionChange(message, userId, emoji);
           await message.save();
 
-          // Populate reactions for response
-          const populatedMessage = await Message.findById(messageId)
-            .populate('reactions.userId', 'username profilePicture');
+          const updatedMessage = await populateMessageForClient(messageId);
+          const conversationId = message.conversationId.toString();
 
-          // Broadcast to conversation room
-          io.to(message.conversationId.toString()).emit('reaction_updated', {
-            messageId,
-            reactions: populatedMessage.reactions,
-          });
+          io.to(conversationId).emit("reaction_updated", updatedMessage);
+          callback({ success: true, message: updatedMessage });
         } catch (error) {
-          console.error('Add reaction error:', error);
+          console.error("Add reaction error:", error);
+          callback({ success: false, message: "Failed to update reaction" });
         }
       });
 
-      // Handle disconnect
-      socket.on('disconnect', async () => {
+      socket.on("disconnect", async () => {
         console.log(`User disconnected: ${userId}`);
 
-        // Remove from online users map
         onlineUsers.delete(userId);
 
-        // Update user offline status
         await User.findByIdAndUpdate(userId, {
           isOnline: false,
           lastSeen: new Date(),
         });
 
-        // Broadcast user offline status
-        socket.broadcast.emit('user_offline', userId);
+        socket.broadcast.emit("user_offline", userId);
       });
     } catch (error) {
-      console.error('Socket connection error:', error);
+      console.error("Socket connection error:", error);
     }
   });
 
-  // Store io instance for use in controllers
   return io;
 };

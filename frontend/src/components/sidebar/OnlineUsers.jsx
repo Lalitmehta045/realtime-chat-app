@@ -7,14 +7,18 @@ export const OnlineUsers = ({ onSelectUser, currentUserId }) => {
 
   // Get user details from conversations - check both socket state and DB isOnline
   const onlineUserList = [];
-  conversations.forEach(conv => {
+  conversations.forEach((conv) => {
     if (!conv.isGroup) {
-      const otherParticipant = conv.participants?.find(p => p._id?.toString() !== currentUserId?.toString());
+      const otherParticipant = conv.participants?.find(
+        (participant) => participant._id?.toString() !== currentUserId?.toString()
+      );
+
       if (otherParticipant) {
-        // Check if online from socket OR database
-        const isOnlineFromSocket = onlineUsers.some(id => id?.toString() === otherParticipant._id?.toString());
+        const isOnlineFromSocket = onlineUsers.some(
+          (id) => id?.toString() === otherParticipant._id?.toString()
+        );
         const isOnlineFromDB = otherParticipant.isOnline;
-        
+
         if (isOnlineFromSocket || isOnlineFromDB) {
           onlineUserList.push({
             ...otherParticipant,
@@ -28,12 +32,12 @@ export const OnlineUsers = ({ onSelectUser, currentUserId }) => {
   if (onlineUserList.length === 0) return null;
 
   return (
-    <div className="px-4 py-3 border-b border-[var(--border-glass)]">
-      <h3 className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-3">
-        Online — {onlineUserList.length}
+    <div className="border-b border-[var(--border-glass)] px-3 py-3 sm:px-4">
+      <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+        Online - {onlineUserList.length}
       </h3>
-      
-      <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1">
+
+      <div className="scrollbar-hide flex gap-3 overflow-x-auto pb-1">
         {onlineUserList.map((user, index) => (
           <motion.button
             key={user._id}
@@ -43,7 +47,7 @@ export const OnlineUsers = ({ onSelectUser, currentUserId }) => {
             transition={{ delay: index * 0.05 }}
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.95 }}
-            className="flex flex-col items-center gap-1.5 shrink-0"
+            className="flex shrink-0 flex-col items-center gap-1.5"
           >
             <Avatar
               src={user.profilePicture}
@@ -51,7 +55,7 @@ export const OnlineUsers = ({ onSelectUser, currentUserId }) => {
               size="lg"
               isOnline={true}
             />
-            <span className="text-xs text-[var(--text-muted)] truncate max-w-[60px]">
+            <span className="max-w-[60px] truncate text-xs text-[var(--text-muted)]">
               {user.username}
             </span>
           </motion.button>

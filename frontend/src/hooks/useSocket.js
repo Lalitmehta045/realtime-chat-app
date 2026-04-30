@@ -1,26 +1,36 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuthStore } from '@store/useAuthStore';
-import { initSocket, getSocket, disconnectSocket } from '@lib/socket';
+import { initSocket, disconnectSocket } from '@lib/socket';
 
 export const useSocket = () => {
   const { authUser, accessToken } = useAuthStore();
-  const socketRef = useRef(null);
+  const [socket, setSocket] = useState(null);
+  const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
-    if (accessToken && !socketRef.current) {
-      socketRef.current = initSocket(accessToken);
-    }
+    if (accessToken && !socket) { // Only initialize if accessToken exists and socket is not yet set
+      const newSocket = initSocket(accessToken);
+      setSocket(newSocket);
 
-    return () => {
-      if (!accessToken) {
+      newSocket.on('connect', () => setIsConnected(true));
+      newSocket.on('disconnect', () => setIsConnected(false));
+      
+      return () => {
+        newSocket.off('connect');
+        newSocket.off('disconnect');
+        disconnectSocket(); // Disconnect socket when component unmounts or accessToken changes
+        setSocket(null);
+        setIsConnected(false);
+      };
+    } else if (!accessToken && socket) { // Disconnect if accessToken is removed but socket exists
         disconnectSocket();
-        socketRef.current = null;
-      }
-    };
-  }, [accessToken]);
+        setSocket(null);
+        setIsConnected(false);
+    }
+  }, [accessToken, socket]);
 
   return {
-    socket: socketRef.current,
-    isConnected: socketRef.current?.connected || false,
+    socket,
+    isConnected,
   };
 };

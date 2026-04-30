@@ -1,4 +1,4 @@
-import React from 'react';
+
 
 export const ForwardedLabel = ({ isSent = false }) => {
   const color = isSent ? 'rgba(221,214,254,0.9)' : 'var(--color-text-tertiary)';
