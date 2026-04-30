@@ -339,9 +339,23 @@ const MessageBubbleComponent = ({
 
         <div className={`relative flex min-w-0 flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
           {!isOwn && isFirstInGroup && message.senderId?.username && (
-            <span className="mb-1 ml-1 text-[11px] font-medium text-[var(--text-muted)]">
-              {message.senderId.username}
-            </span>
+            <div className="flex items-center gap-2 mb-1 ml-1">
+              <span className="text-[11px] font-medium text-[var(--text-muted)]">
+                {message.senderId.username}
+              </span>
+              {message.text?.includes(`@${authUser?.username}`) && (
+                <span className="px-1.5 py-0.5 rounded-full bg-violet-500/20 text-violet-300 text-[9px] font-bold uppercase tracking-wider border border-violet-500/30">
+                  Mentioned you
+                </span>
+              )}
+            </div>
+          )}
+          {!isOwn && !isFirstInGroup && message.text?.includes(`@${authUser?.username}`) && (
+            <div className="flex items-center gap-2 mb-1 ml-1">
+              <span className="px-1.5 py-0.5 rounded-full bg-violet-500/20 text-violet-300 text-[9px] font-bold uppercase tracking-wider border border-violet-500/30">
+                Mentioned you
+              </span>
+            </div>
           )}
 
           <div className={`relative flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
@@ -405,7 +419,14 @@ const MessageBubbleComponent = ({
                 willChange: 'transform',
                 background: !isFailed ? (isOwn ? 'var(--message-sent)' : 'var(--message-received)') : undefined,
                 color: !isFailed ? (isOwn ? 'var(--message-sent-text)' : 'var(--message-received-text)') : undefined,
-                boxShadow: !isFailed ? 'var(--glass-shadow)' : undefined,
+                boxShadow: !isFailed ? (
+                  message.text?.includes(`@${authUser?.username}`) 
+                    ? '0 0 20px rgba(139, 92, 246, 0.3), var(--glass-shadow)' 
+                    : 'var(--glass-shadow)'
+                ) : undefined,
+                border: !isFailed && !isOwn && message.text?.includes(`@${authUser?.username}`)
+                  ? '1px solid rgba(139, 92, 246, 0.5)'
+                  : undefined,
               }}
             >
               {isEditing ? (
@@ -449,7 +470,16 @@ const MessageBubbleComponent = ({
 
                   {message.text && (
                     <p className="break-words pr-20 text-[15px] leading-6 text-inherit">
-                      {message.text}
+                      {message.text.split(/(@\w+)/g).map((part, i) => {
+                        if (part.startsWith('@')) {
+                          return (
+                            <span key={i} className={`font-bold transition-colors ${isOwn ? 'text-sky-200' : 'text-sky-400'}`}>
+                              {part}
+                            </span>
+                          );
+                        }
+                        return part;
+                      })}
                     </p>
                   )}
                 </>

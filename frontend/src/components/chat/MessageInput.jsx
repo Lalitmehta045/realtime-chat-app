@@ -12,6 +12,9 @@ import { emitTypingStart, emitTypingStop } from '@lib/socket';
 import toast from 'react-hot-toast';
 import { ReplyPreviewBar } from './ReplyPreviewBar';
 import { Loader } from '@components/shared/Loader';
+import { TypingIndicator } from './TypingIndicator';
+import { useChatStore } from '@store/useChatStore';
+import { Avatar } from '@components/shared/Avatar';
 
 export const MessageInput = ({
   conversationId,
@@ -31,6 +34,23 @@ export const MessageInput = ({
     ? Math.min(320, Math.max(window.innerWidth - 24, 240))
     : 300;
   const emojiPickerHeight = typeof window !== 'undefined' && window.innerWidth < 420 ? 340 : 380;
+
+  // Mention state
+  const { conversations } = useChatStore();
+  const [mentionSearch, setMentionSearch] = useState('');
+  const [showMentionList, setShowMentionList] = useState(false);
+
+  const conversation = useMemo(() => 
+    conversations.find(c => c._id === conversationId),
+    [conversations, conversationId]
+  );
+
+  const filteredMembers = useMemo(() => {
+    if (!mentionSearch || !conversation?.isGroup) return [];
+    return conversation.participants.filter(p => 
+      p.username.toLowerCase().includes(mentionSearch.toLowerCase())
+    );
+  }, [mentionSearch, conversation]);
 
   const syncTextareaHeight = useCallback(() => {
     const textarea = textareaRef.current;
@@ -68,9 +88,45 @@ export const MessageInput = ({
   }, [conversationId]);
 
   const handleTextChange = useCallback((event) => {
-    setText(event.target.value);
+    const val = event.target.value;
+    setText(val);
     handleTyping();
-  }, [handleTyping]);
+
+    // Mention detection
+    const cursorPosition = event.target.selectionStart;
+    const textBeforeCursor = val.slice(0, cursorPosition);
+    const lastAtSymbol = textBeforeCursor.lastIndexOf('@');
+
+    if (lastAtSymbol !== -1 && conversation?.isGroup) {
+      const searchPart = textBeforeCursor.slice(lastAtSymbol + 1);
+      if (!searchPart.includes(' ')) {
+        setMentionSearch(searchPart);
+        setShowMentionList(true);
+      } else {
+        setShowMentionList(false);
+      }
+    } else {
+      setShowMentionList(false);
+    }
+  }, [handleTyping, conversation]);
+
+  const insertMention = useCallback((username) => {
+    const cursorPosition = textareaRef.current.selectionStart;
+    const textBeforeCursor = text.slice(0, cursorPosition);
+    const textAfterCursor = text.slice(cursorPosition);
+    const lastAtSymbol = textBeforeCursor.lastIndexOf('@');
+
+    const newText = textBeforeCursor.slice(0, lastAtSymbol) + `@${username} ` + textAfterCursor;
+    setText(newText);
+    setShowMentionList(false);
+    
+    requestAnimationFrame(() => {
+      textareaRef.current.focus();
+      const newPos = lastAtSymbol + username.length + 2;
+      textareaRef.current.setSelectionRange(newPos, newPos);
+      syncTextareaHeight();
+    });
+  }, [text, syncTextareaHeight]);
 
   const handleImageSelect = useCallback((event) => {
     const file = event.target.files?.[0];
@@ -176,6 +232,36 @@ export const MessageInput = ({
       className="sticky bottom-0 z-20 border-t border-[var(--border-glass)] bg-[color:var(--bg-base)]/92 px-2.5 pt-2 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] backdrop-blur-2xl sm:px-4"
       data-no-swipe-back="true"
     >
+      <div className="max-w-5xl mx-auto w-full mb-1">
+        <TypingIndicator conversationId={conversationId} />
+      </div>
+
+      <AnimatePresence>
+        {showMentionList && filteredMembers.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
+            className="absolute bottom-full left-4 right-4 z-50 mb-2 overflow-hidden rounded-2xl border border-[var(--border-glass)] bg-[var(--bg-surface)] shadow-2xl max-w-sm"
+          >
+            <div className="max-h-48 overflow-y-auto p-1.5">
+              {filteredMembers.map((member) => (
+                <button
+                  key={member._id}
+                  onClick={() => insertMention(member.username)}
+                  className="flex w-full items-center gap-3 rounded-xl p-2.5 transition-colors hover:bg-[var(--bg-surface-2)]"
+                >
+                  <Avatar src={member.profilePicture} alt={member.username} size="sm" />
+                  <div className="text-left">
+                    <p className="text-sm font-semibold text-[var(--text-primary)]">{member.username}</p>
+                    <p className="text-xs text-[var(--text-muted)]">@{member.username}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <AnimatePresence initial={false}>
         {replyToPayload && (
           <div className="overflow-hidden rounded-t-2xl">

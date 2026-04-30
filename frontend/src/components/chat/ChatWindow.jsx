@@ -315,7 +315,6 @@ export const ChatWindow = ({ onBack }) => {
 
         {selectedConversation && (
           <div className="relative z-10">
-            <TypingIndicator conversationId={selectedConversation._id} />
             <MessageInput
               conversationId={selectedConversation._id}
               onSendMessage={handleSendMessage}
