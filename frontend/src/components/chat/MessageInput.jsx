@@ -12,7 +12,6 @@ import { emitTypingStart, emitTypingStop } from '@lib/socket';
 import toast from 'react-hot-toast';
 import { ReplyPreviewBar } from './ReplyPreviewBar';
 import { Loader } from '@components/shared/Loader';
-import { TypingIndicator } from './TypingIndicator';
 
 export const MessageInput = ({
   conversationId,
@@ -177,10 +176,6 @@ export const MessageInput = ({
       className="sticky bottom-0 z-20 border-t border-[var(--border-glass)] bg-[color:var(--bg-base)]/92 px-2.5 pt-2 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] backdrop-blur-2xl sm:px-4"
       data-no-swipe-back="true"
     >
-      <div className="absolute bottom-full left-0 right-0 z-0">
-        <TypingIndicator conversationId={conversationId} />
-      </div>
-
       <AnimatePresence initial={false}>
         {replyToPayload && (
           <div className="overflow-hidden rounded-t-2xl">

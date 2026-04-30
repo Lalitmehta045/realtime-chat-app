@@ -32,13 +32,13 @@ export const TypingIndicator = memo(({ conversationId }) => {
   return (
     <AnimatePresence initial={false}>
       <motion.div
-        initial={{ opacity: 0, y: 10, scale: 0.95 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: 10, scale: 0.95 }}
-        transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-        className="pointer-events-none w-full px-3 pb-3 sm:px-4"
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 8 }}
+        transition={{ duration: 0.18, ease: 'easeOut' }}
+        className="pointer-events-none px-3 pb-2 sm:px-4"
       >
-        <div className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/10 px-3.5 py-2 shadow-xl shadow-black/20 backdrop-blur-2xl">
+        <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/6 px-3 py-1.5 backdrop-blur-xl">
           <div className="flex items-center gap-1">
             {[0, 1, 2].map((index) => (
               <motion.span
